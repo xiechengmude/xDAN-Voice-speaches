@@ -210,14 +210,19 @@ async def generate_audio(
 ) -> AsyncGenerator[bytes, None]:
     if sample_rate is None:
         sample_rate = SAMPLE_RATE
-    voice_language = next(v.language for v in VOICES if v.name == voice)
-    # 标准化语言代码，确保与 espeak 兼容
-    normalized_language = normalize_language_code(voice_language)
+    
+    # 修复纯中文文本问题：检测并自动添加标点
+    # phonemizer 需要至少一个 ASCII 字符才能正确处理
+    has_ascii = any(ord(char) < 128 for char in text)
+    if not has_ascii and text.strip():
+        # 如果是纯中文/非ASCII文本，自动在末尾添加句号
+        text = text + "."
+        logger.debug(f"Pure non-ASCII text detected, adding period for phonemizer compatibility")
     
     start = time.perf_counter()
     try:
-        # Try with normalized language specification first
-        async for audio_data, _ in kokoro_tts.create_stream(text, voice, lang=normalized_language, speed=speed):
+        # 直接调用，不指定语言参数（因为 espeak 不支持我们的语言代码）
+        async for audio_data, _ in kokoro_tts.create_stream(text, voice, speed=speed):
             assert isinstance(audio_data, np.ndarray) and audio_data.dtype == np.float32 and isinstance(sample_rate, int)
             normalized_audio_data = (audio_data * np.iinfo(np.int16).max).astype(np.int16)
             audio_bytes = normalized_audio_data.tobytes()
@@ -225,17 +230,7 @@ async def generate_audio(
                 audio_bytes = resample_audio(audio_bytes, SAMPLE_RATE, sample_rate)
             yield audio_bytes
     except Exception as e:
-        # Fallback: if TTS fails (e.g., phonemizer issue), try without language specification
-        logger.warning(f"TTS failed with lang='{normalized_language}' (original: '{voice_language}'), trying without lang: {e}")
-        try:
-            async for audio_data, _ in kokoro_tts.create_stream(text, voice, speed=speed):
-                assert isinstance(audio_data, np.ndarray) and audio_data.dtype == np.float32 and isinstance(sample_rate, int)
-                normalized_audio_data = (audio_data * np.iinfo(np.int16).max).astype(np.int16)
-                audio_bytes = normalized_audio_data.tobytes()
-                if sample_rate != SAMPLE_RATE:
-                    audio_bytes = resample_audio(audio_bytes, SAMPLE_RATE, sample_rate)
-                yield audio_bytes
-        except Exception as e2:
-            logger.error(f"TTS fallback also failed: {e2}")
-            raise e2
+        logger.error(f"TTS failed: {e}")
+        raise
+    
     logger.info(f"Generated audio for {len(text)} characters in {time.perf_counter() - start}s")
