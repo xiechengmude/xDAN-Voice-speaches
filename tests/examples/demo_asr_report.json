@@ -1,0 +1,19 @@
+{
+  "test_time": "2025-08-14 16:19:54",
+  "base_url": "http://localhost:8000",
+  "models_tested": [
+    "Systran/faster-whisper-large-v3",
+    "Systran/faster-distil-whisper-large-v3",
+    "Systran/faster-whisper-medium",
+    "Systran/faster-whisper-small"
+  ],
+  "summary": {
+    "total_tests": 20,
+    "average_accuracy": {
+      "chinese": 96.5,
+      "english": 97.6,
+      "mixed": 94.2
+    },
+    "recommendation": "faster-distil-whisper-large-v3"
+  }
+}

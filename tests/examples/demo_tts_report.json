@@ -1,0 +1,24 @@
+{
+  "test_time": "2025-08-14 16:19:54",
+  "base_url": "http://localhost:8000",
+  "models_tested": [
+    "speaches-ai/Kokoro-82M-v1.0-ONNX"
+  ],
+  "summary": {
+    "total_tests": 35,
+    "successful": 35,
+    "voices_tested": {
+      "chinese": 8,
+      "english": 9
+    },
+    "features": {
+      "speed_control": "excellent",
+      "language_support": [
+        "chinese",
+        "english",
+        "mixed"
+      ],
+      "audio_quality": "high"
+    }
+  }
+}

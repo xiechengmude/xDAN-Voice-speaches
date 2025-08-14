@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微信风格语音输入 - Web 版</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            font-size: 24px;
+        }
+        
+        .input-area {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f8f8;
+            border-radius: 8px;
+            min-height: 100px;
+            position: relative;
+        }
+        
+        #transcriptionResult {
+            min-height: 60px;
+            padding: 10px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .voice-button {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #07c160;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 30px auto;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .voice-button:hover {
+            background: #06a352;
+            transform: scale(1.05);
+        }
+        
+        .voice-button.recording {
+            background: #f45454;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .voice-button svg {
+            width: 40px;
+            height: 40px;
+            fill: white;
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(244, 84, 84, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 20px rgba(244, 84, 84, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(244, 84, 84, 0);
+            }
+        }
+        
+        .status {
+            text-align: center;
+            margin: 10px 0;
+            font-size: 14px;
+            color: #666;
+            min-height: 20px;
+        }
+        
+        .waveform {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            height: 60px;
+            margin: 20px 0;
+        }
+        
+        .waveform.active {
+            display: flex;
+        }
+        
+        .wave-bar {
+            width: 4px;
+            height: 20px;
+            background: #07c160;
+            margin: 0 2px;
+            animation: wave 0.5s ease-in-out infinite;
+            animation-delay: calc(var(--i) * 0.1s);
+        }
+        
+        @keyframes wave {
+            0%, 100% {
+                height: 20px;
+            }
+            50% {
+                height: 40px;
+            }
+        }
+        
+        .settings {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .setting-item {
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        select, input[type="text"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .error {
+            color: #f45454;
+            font-size: 14px;
+            margin-top: 10px;
+            text-align: center;
+        }
+        
+        .history {
+            margin-top: 30px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .history-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f8f8;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .history-time {
+            font-size: 12px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 语音输入转文字</h1>
+        
+        <div class="input-area">
+            <div class="status" id="status">点击下方按钮开始录音</div>
+            
+            <div class="waveform" id="waveform">
+                <div class="wave-bar" style="--i: 0"></div>
+                <div class="wave-bar" style="--i: 1"></div>
+                <div class="wave-bar" style="--i: 2"></div>
+                <div class="wave-bar" style="--i: 3"></div>
+                <div class="wave-bar" style="--i: 4"></div>
+                <div class="wave-bar" style="--i: 5"></div>
+                <div class="wave-bar" style="--i: 6"></div>
+            </div>
+            
+            <div id="transcriptionResult"></div>
+        </div>
+        
+        <button class="voice-button" id="voiceButton">
+            <svg viewBox="0 0 24 24" id="micIcon">
+                <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+            </svg>
+        </button>
+        
+        <div class="error" id="error"></div>
+        
+        <div class="settings">
+            <h3>设置</h3>
+            <div class="setting-item">
+                <label>服务地址:</label>
+                <input type="text" id="baseUrl" value="http://localhost:8000" style="width: 200px;">
+            </div>
+            <div class="setting-item">
+                <label>ASR 模型:</label>
+                <select id="modelSelect">
+                    <option value="Systran/faster-distil-whisper-large-v3">Distil Whisper Large (推荐)</option>
+                    <option value="Systran/faster-whisper-large-v3">Whisper Large V3</option>
+                    <option value="Systran/faster-whisper-medium">Whisper Medium</option>
+                    <option value="Systran/faster-whisper-small">Whisper Small</option>
+                </select>
+            </div>
+            <div class="setting-item">
+                <label>语言:</label>
+                <select id="languageSelect">
+                    <option value="zh">中文</option>
+                    <option value="en">英文</option>
+                    <option value="">自动检测</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="history" id="history">
+            <h3>历史记录</h3>
+        </div>
+    </div>
+
+    <script>
+        class VoiceInput {
+            constructor() {
+                this.mediaRecorder = null;
+                this.audioChunks = [];
+                this.isRecording = false;
+                
+                // 获取 DOM 元素
+                this.voiceButton = document.getElementById('voiceButton');
+                this.status = document.getElementById('status');
+                this.result = document.getElementById('transcriptionResult');
+                this.error = document.getElementById('error');
+                this.waveform = document.getElementById('waveform');
+                this.history = document.getElementById('history');
+                
+                // 设置
+                this.baseUrlInput = document.getElementById('baseUrl');
+                this.modelSelect = document.getElementById('modelSelect');
+                this.languageSelect = document.getElementById('languageSelect');
+                
+                // 初始化
+                this.init();
+            }
+            
+            init() {
+                // 绑定按钮事件
+                this.voiceButton.addEventListener('mousedown', () => this.startRecording());
+                this.voiceButton.addEventListener('mouseup', () => this.stopRecording());
+                this.voiceButton.addEventListener('mouseleave', () => {
+                    if (this.isRecording) this.stopRecording();
+                });
+                
+                // 触摸事件（移动端）
+                this.voiceButton.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.startRecording();
+                });
+                this.voiceButton.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.stopRecording();
+                });
+                
+                // 键盘快捷键
+                document.addEventListener('keydown', (e) => {
+                    if (e.code === 'Space' && !this.isRecording) {
+                        e.preventDefault();
+                        this.startRecording();
+                    }
+                });
+                
+                document.addEventListener('keyup', (e) => {
+                    if (e.code === 'Space' && this.isRecording) {
+                        e.preventDefault();
+                        this.stopRecording();
+                    }
+                });
+            }
+            
+            async startRecording() {
+                try {
+                    this.error.textContent = '';
+                    this.audioChunks = [];
+                    
+                    // 获取麦克风权限
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    
+                    // 创建 MediaRecorder
+                    this.mediaRecorder = new MediaRecorder(stream, {
+                        mimeType: 'audio/webm;codecs=opus'
+                    });
+                    
+                    this.mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            this.audioChunks.push(event.data);
+                        }
+                    };
+                    
+                    this.mediaRecorder.onstop = () => {
+                        this.processAudio();
+                    };
+                    
+                    // 开始录音
+                    this.mediaRecorder.start();
+                    this.isRecording = true;
+                    
+                    // 更新 UI
+                    this.voiceButton.classList.add('recording');
+                    this.status.textContent = '正在录音...松开结束';
+                    this.waveform.classList.add('active');
+                    this.result.textContent = '';
+                    
+                } catch (err) {
+                    console.error('录音失败:', err);
+                    this.error.textContent = '无法访问麦克风，请检查权限设置';
+                }
+            }
+            
+            stopRecording() {
+                if (!this.isRecording) return;
+                
+                this.isRecording = false;
+                this.mediaRecorder.stop();
+                
+                // 停止所有音轨
+                this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                
+                // 更新 UI
+                this.voiceButton.classList.remove('recording');
+                this.status.textContent = '正在识别...';
+                this.waveform.classList.remove('active');
+            }
+            
+            async processAudio() {
+                // 创建音频 Blob
+                const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+                
+                // 转换为 WAV 格式（Speaches 需要）
+                const wavBlob = await this.convertToWav(audioBlob);
+                
+                // 调用 ASR API
+                await this.transcribeAudio(wavBlob);
+            }
+            
+            async convertToWav(webmBlob) {
+                // 简化处理：直接使用 webm
+                // 实际应用中可能需要使用 Web Audio API 转换
+                return webmBlob;
+            }
+            
+            async transcribeAudio(audioBlob) {
+                try {
+                    const formData = new FormData();
+                    formData.append('file', audioBlob, 'recording.webm');
+                    formData.append('model', this.modelSelect.value);
+                    
+                    const language = this.languageSelect.value;
+                    if (language) {
+                        formData.append('language', language);
+                    }
+                    
+                    formData.append('response_format', 'json');
+                    
+                    const response = await fetch(`${this.baseUrlInput.value}/v1/audio/transcriptions`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        this.displayResult(result.text);
+                    } else {
+                        throw new Error(`识别失败: ${response.status}`);
+                    }
+                    
+                } catch (err) {
+                    console.error('转录失败:', err);
+                    this.error.textContent = '识别失败，请检查服务是否正常运行';
+                    this.status.textContent = '识别失败';
+                }
+            }
+            
+            displayResult(text) {
+                this.result.textContent = text || '(无法识别)';
+                this.status.textContent = '识别完成';
+                
+                // 添加到历史记录
+                this.addToHistory(text);
+                
+                // 触发自定义事件
+                window.dispatchEvent(new CustomEvent('voiceInputComplete', { 
+                    detail: { text } 
+                }));
+            }
+            
+            addToHistory(text) {
+                const time = new Date().toLocaleTimeString('zh-CN');
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+                historyItem.innerHTML = `
+                    <div class="history-time">${time}</div>
+                    <div>${text}</div>
+                `;
+                
+                this.history.insertBefore(historyItem, this.history.children[1]);
+                
+                // 限制历史记录数量
+                while (this.history.children.length > 11) {
+                    this.history.removeChild(this.history.lastChild);
+                }
+            }
+        }
+        
+        // 初始化
+        const voiceInput = new VoiceInput();
+        
+        // 监听语音输入完成事件
+        window.addEventListener('voiceInputComplete', (e) => {
+            console.log('语音输入完成:', e.detail.text);
+            // 这里可以将文字发送到其他地方
+        });
+    </script>
+</body>
+</html>
