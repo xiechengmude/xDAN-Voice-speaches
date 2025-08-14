@@ -4,8 +4,9 @@
 echo "=== 启动 Speaches 服务 (6小时缓存) ==="
 echo ""
 
-# 设置项目目录
-PROJECT_DIR="/Users/gump_m2/Documents/Agent-RL/xDAN-Voice-speaches"
+# 设置项目目录 - 使用脚本所在目录
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$SCRIPT_DIR"
 cd "$PROJECT_DIR"
 
 # 检查是否已有服务运行

@@ -6,8 +6,9 @@ set -e  # 遇到错误立即退出
 echo "=== Speaches 服务重启脚本 ==="
 echo ""
 
-# 项目配置
-PROJECT_DIR="/Users/gump_m2/Documents/Agent-RL/xDAN-Voice-speaches"
+# 项目配置 - 使用脚本所在目录
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$SCRIPT_DIR"
 PORT=8000
 PID_FILE="$PROJECT_DIR/speaches.pid"
 LOG_FILE="$PROJECT_DIR/speaches_6h.log"
