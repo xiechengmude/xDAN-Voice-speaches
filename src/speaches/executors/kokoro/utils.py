@@ -126,6 +126,28 @@ hf_model_filter = HfModelFilter(
 logger = logging.getLogger(__name__)
 
 
+def normalize_language_code(lang_code: str) -> str:
+    """
+    将各种中文代码统一映射为 espeak 支持的标准代码
+    
+    Args:
+        lang_code: 输入的语言代码
+        
+    Returns:
+        标准化后的语言代码
+    """
+    chinese_codes = {
+        "zh-cn": "zh",
+        "zh-hans": "zh", 
+        "zh-tw": "zh",
+        "zh-hant": "zh",
+        "cmn": "zh",
+        "mandarin": "zh",
+        "chinese": "zh"
+    }
+    return chinese_codes.get(lang_code.lower(), lang_code)
+
+
 class KokoroModelRegistry(ModelRegistry):
     def list_remote_models(self) -> Generator[KokoroModel, None, None]:
         models = huggingface_hub.list_models(**self.hf_model_filter.list_model_kwargs(), cardData=True)
@@ -189,12 +211,31 @@ async def generate_audio(
     if sample_rate is None:
         sample_rate = SAMPLE_RATE
     voice_language = next(v.language for v in VOICES if v.name == voice)
+    # 标准化语言代码，确保与 espeak 兼容
+    normalized_language = normalize_language_code(voice_language)
+    
     start = time.perf_counter()
-    async for audio_data, _ in kokoro_tts.create_stream(text, voice, lang=voice_language, speed=speed):
-        assert isinstance(audio_data, np.ndarray) and audio_data.dtype == np.float32 and isinstance(sample_rate, int)
-        normalized_audio_data = (audio_data * np.iinfo(np.int16).max).astype(np.int16)
-        audio_bytes = normalized_audio_data.tobytes()
-        if sample_rate != SAMPLE_RATE:
-            audio_bytes = resample_audio(audio_bytes, SAMPLE_RATE, sample_rate)
-        yield audio_bytes
+    try:
+        # Try with normalized language specification first
+        async for audio_data, _ in kokoro_tts.create_stream(text, voice, lang=normalized_language, speed=speed):
+            assert isinstance(audio_data, np.ndarray) and audio_data.dtype == np.float32 and isinstance(sample_rate, int)
+            normalized_audio_data = (audio_data * np.iinfo(np.int16).max).astype(np.int16)
+            audio_bytes = normalized_audio_data.tobytes()
+            if sample_rate != SAMPLE_RATE:
+                audio_bytes = resample_audio(audio_bytes, SAMPLE_RATE, sample_rate)
+            yield audio_bytes
+    except Exception as e:
+        # Fallback: if TTS fails (e.g., phonemizer issue), try without language specification
+        logger.warning(f"TTS failed with lang='{normalized_language}' (original: '{voice_language}'), trying without lang: {e}")
+        try:
+            async for audio_data, _ in kokoro_tts.create_stream(text, voice, speed=speed):
+                assert isinstance(audio_data, np.ndarray) and audio_data.dtype == np.float32 and isinstance(sample_rate, int)
+                normalized_audio_data = (audio_data * np.iinfo(np.int16).max).astype(np.int16)
+                audio_bytes = normalized_audio_data.tobytes()
+                if sample_rate != SAMPLE_RATE:
+                    audio_bytes = resample_audio(audio_bytes, SAMPLE_RATE, sample_rate)
+                yield audio_bytes
+        except Exception as e2:
+            logger.error(f"TTS fallback also failed: {e2}")
+            raise e2
     logger.info(f"Generated audio for {len(text)} characters in {time.perf_counter() - start}s")
