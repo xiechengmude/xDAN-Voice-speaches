@@ -6,7 +6,7 @@ echo "=== Speaches 服务启动和测试脚本 ==="
 echo ""
 
 # 设置变量
-PROJECT_DIR="/Users/gump_m2/Documents/Agent-RL/xDAN-Voice-speaches"
+PROJECT_DIR="./"
 export SPEACHES_BASE_URL="http://localhost:8000"
 
 cd "$PROJECT_DIR"
