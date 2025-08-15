@@ -16,7 +16,7 @@ from typing import Dict, List, Tuple
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # 配置
-BASE_URL = os.getenv("SPEACHES_BASE_URL", "http://localhost:8000")
+BASE_URL = os.getenv("SPEACHES_BASE_URL", "http://24.124.32.70:40693")
 TTS_MODEL = "speaches-ai/Kokoro-82M-v1.0-ONNX"
 ASR_MODELS = [
     "Systran/faster-whisper-large-v3",
